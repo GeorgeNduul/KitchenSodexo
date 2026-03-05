@@ -26,7 +26,17 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Brief description..."
-            android:maxLines="2" />
+            android:textColor="#757575"
+            android:text="Description..." />
+
+        <TextView
+            android:id="@+id/recipeAllergies"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="#D32F2F"
+            android:textStyle="bold|italic"
+            android:text="Allergies: None" />
+
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

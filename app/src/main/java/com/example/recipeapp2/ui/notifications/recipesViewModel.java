@@ -41,9 +41,11 @@ public class recipesViewModel extends ViewModel {
         });
     }
 
-    public void addRecipe(String name, String desc) {
+    // Inside recipesViewModel.java
+    public void addRecipe(String name, String desc, String allergies) {
         String id = db.collection("recipes").document().getId();
-        Recipe newRecipe = new Recipe(id, name, desc);
+        // Pass the allergies string into the constructor
+        Recipe newRecipe = new Recipe(id, name, desc, allergies);
         db.collection("recipes").document(id).set(newRecipe);
     }
 }
