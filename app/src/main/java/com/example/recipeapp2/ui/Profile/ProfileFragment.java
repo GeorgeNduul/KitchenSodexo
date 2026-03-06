@@ -1,8 +1,8 @@
 package com.example.recipeapp2.ui.Profile;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.content.ContentValues;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -24,43 +24,37 @@ import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
 
+import com.example.recipeapp2.MainActivity;
 import com.example.recipeapp2.databinding.FragmentProfileBinding;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 public class ProfileFragment extends Fragment {
 
-    private static final String TAG = "KitchenSodexo_Camera";
+    private static final String TAG = "KitchenSodexo_Profile";
     private FragmentProfileBinding binding;
+    private ProfileViewModel viewModel;
     private ImageCapture imageCapture;
     private final Executor cameraExecutor = Executors.newSingleThreadExecutor();
+    private FirebaseAuth mAuth;
 
-    // Modern way to handle permissions (Replaces onRequestPermissionsResult)
     private final ActivityResultLauncher<String[]> permissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
-                boolean allGranted = true;
-                for (Boolean granted : result.values()) {
-                    if (!granted) {
-                        allGranted = false;
-                        break;
-                    }
-                }
-
-                if (allGranted) {
-                    initCameraProvider();
+                if (result.containsValue(false)) {
+                    Toast.makeText(requireContext(), "Permissions denied.", Toast.LENGTH_SHORT).show();
                 } else {
-                    Toast.makeText(requireContext(), "Camera permissions denied. Cannot take photo.", Toast.LENGTH_SHORT).show();
+                    initCameraProvider();
                 }
             });
-
-    public ProfileFragment() {}
 
     @Nullable
     @Override
@@ -72,32 +66,67 @@ public class ProfileFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        viewModel = new ViewModelProvider(this).get(ProfileViewModel.class);
+        mAuth = FirebaseAuth.getInstance();
 
+        // 1. Display Current User Info
+        FirebaseUser user = mAuth.getCurrentUser();
+        // Tip: You can use binding.tvProfileHeader.setText("Hello, " + user.getEmail()) here if you'd like
+
+        // 2. Camera Setup
         binding.bCapture1.setEnabled(false);
         binding.bCapture1.setOnClickListener(v -> capturePhoto());
-
         checkPermissionsAndStart();
+
+        // 3. Password Update Logic
+        binding.btnUpdatePassword.setOnClickListener(v -> {
+            String newPass = binding.etNewPassword.getText().toString().trim();
+            if (!newPass.isEmpty()) {
+                viewModel.updatePassword(newPass);
+            } else {
+                Toast.makeText(getContext(), "Enter a new password", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // 4. Logout Logic (Added for KitchenSodexo)
+        binding.btnLogout.setOnClickListener(v -> {
+            mAuth.signOut();
+            Intent intent = new Intent(requireActivity(), MainActivity.class);
+            // These flags clear the backstack so the user can't "back" into the app
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            requireActivity().finish();
+        });
+
+        // 5. Observe ViewModel Status for Feedback
+        viewModel.getStatusMessage().observe(getViewLifecycleOwner(), message -> {
+            if (message != null) {
+                Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                if (message.contains("successfully")) {
+                    binding.etNewPassword.setText("");
+                }
+            }
+        });
     }
 
+    // --- CAMERA METHODS ---
     private void checkPermissionsAndStart() {
-        List<String> permissionsToRequest = new ArrayList<>();
-        permissionsToRequest.add(Manifest.permission.CAMERA);
-
-        // Storage permission only needed for older Android versions
+        List<String> permissions = new ArrayList<>();
+        permissions.add(Manifest.permission.CAMERA);
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
         }
 
         boolean needsRequest = false;
-        for (String permission : permissionsToRequest) {
-            if (ContextCompat.checkSelfPermission(requireContext(), permission) != PackageManager.PERMISSION_GRANTED) {
+        for (String p : permissions) {
+            if (ContextCompat.checkSelfPermission(requireContext(), p) != PackageManager.PERMISSION_GRANTED) {
                 needsRequest = true;
                 break;
             }
         }
 
         if (needsRequest) {
-            permissionLauncher.launch(permissionsToRequest.toArray(new String[0]));
+            permissionLauncher.launch(permissions.toArray(new String[0]));
         } else {
             initCameraProvider();
         }
@@ -107,18 +136,15 @@ public class ProfileFragment extends Fragment {
         ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext());
         cameraProviderFuture.addListener(() -> {
             try {
-                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
-                startCameraX(cameraProvider);
+                startCameraX(cameraProviderFuture.get());
             } catch (ExecutionException | InterruptedException e) {
-                Log.e(TAG, "Camera Provider Initialization failed", e);
+                Log.e(TAG, "Error initializing camera: " + e.getMessage());
             }
         }, ContextCompat.getMainExecutor(requireContext()));
     }
 
-    @SuppressLint("UnsafeOptInUsageError")
     private void startCameraX(@NonNull ProcessCameraProvider cameraProvider) {
         cameraProvider.unbindAll();
-
         CameraSelector selector = new CameraSelector.Builder()
                 .requireLensFacing(CameraSelector.LENS_FACING_FRONT).build();
 
@@ -133,46 +159,37 @@ public class ProfileFragment extends Fragment {
             cameraProvider.bindToLifecycle(getViewLifecycleOwner(), selector, preview, imageCapture);
             binding.bCapture1.setEnabled(true);
         } catch (Exception e) {
-            Log.e(TAG, "Binding use cases failed", e);
+            Log.e(TAG, "Use case binding failed", e);
         }
     }
 
     private void capturePhoto() {
         if (imageCapture == null) return;
 
-        long timeStamp = System.currentTimeMillis();
-        ContentValues contentValues = new ContentValues();
-        contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, "Profile_" + timeStamp);
-        contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.MediaColumns.DISPLAY_NAME, "KitchenSodexo_" + System.currentTimeMillis());
+        values.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            contentValues.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/KitchenSodexo");
+            values.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/KitchenSodexo");
         }
 
         ImageCapture.OutputFileOptions options = new ImageCapture.OutputFileOptions.Builder(
                 requireContext().getContentResolver(),
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                contentValues
+                values
         ).build();
-
-        binding.bCapture1.setEnabled(false);
 
         imageCapture.takePicture(options, cameraExecutor, new ImageCapture.OnImageSavedCallback() {
             @Override
             public void onImageSaved(@NonNull ImageCapture.OutputFileResults results) {
-                requireActivity().runOnUiThread(() -> {
-                    binding.bCapture1.setEnabled(true);
-                    Toast.makeText(requireContext(), "Profile Photo Saved!", Toast.LENGTH_SHORT).show();
-                });
+                requireActivity().runOnUiThread(() ->
+                        Toast.makeText(getContext(), "Profile Photo Saved!", Toast.LENGTH_SHORT).show());
             }
 
             @Override
-            public void onError(@NonNull ImageCaptureException exception) {
-                Log.e(TAG, "Photo capture failed: " + exception.getMessage());
-                requireActivity().runOnUiThread(() -> {
-                    binding.bCapture1.setEnabled(true);
-                    Toast.makeText(requireContext(), "Capture Error: " + exception.getMessage(), Toast.LENGTH_SHORT).show();
-                });
+            public void onError(@NonNull ImageCaptureException e) {
+                Log.e(TAG, "Capture failed", e);
             }
         });
     }

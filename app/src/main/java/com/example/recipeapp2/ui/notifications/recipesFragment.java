@@ -27,14 +27,12 @@ public class recipesFragment extends Fragment {
 
         setupRecyclerView();
 
-        // Observe recipes from ViewModel
         viewModel.getRecipes().observe(getViewLifecycleOwner(), recipes -> {
             if (recipes != null && adapter != null) {
                 adapter.updateList(recipes);
             }
         });
 
-        // Click FAB to show the dialog
         binding.fabAddRecipe.setOnClickListener(v -> showAddRecipeDialog());
 
         return binding.getRoot();
@@ -43,31 +41,28 @@ public class recipesFragment extends Fragment {
     private void setupRecyclerView() {
         binding.recipeRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         adapter = new RecipeAdapter(new ArrayList<>(), recipe -> {
-            // Logic for clicking an item (like opening details) can go here
+            // Future: Open recipe details
         });
         binding.recipeRecyclerView.setAdapter(adapter);
     }
 
     private void showAddRecipeDialog() {
-        // 1. Create a layout to hold three input fields
         LinearLayout layout = new LinearLayout(getContext());
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(60, 40, 60, 10);
 
         final EditText nameInput = new EditText(getContext());
-        nameInput.setHint("Recipe Name (e.g., Pancakes)");
+        nameInput.setHint("Recipe Name");
         layout.addView(nameInput);
 
         final EditText descInput = new EditText(getContext());
-        descInput.setHint("Description (e.g., Fluffy and sweet)");
+        descInput.setHint("Description");
         layout.addView(descInput);
 
-        // NEW: Allergy Input Field
         final EditText allergyInput = new EditText(getContext());
-        allergyInput.setHint("Allergies (e.g., Eggs, Milk, Nuts)");
+        allergyInput.setHint("Allergies (Optional)");
         layout.addView(allergyInput);
 
-        // 2. Build and show the Dialog
         new MaterialAlertDialogBuilder(requireContext())
                 .setTitle("Add New Recipe")
                 .setView(layout)
@@ -77,7 +72,6 @@ public class recipesFragment extends Fragment {
                     String allergies = allergyInput.getText().toString().trim();
 
                     if (!name.isEmpty()) {
-                        // 3. Send all three strings to the ViewModel
                         viewModel.addRecipe(name, desc, allergies);
                     }
                 })
