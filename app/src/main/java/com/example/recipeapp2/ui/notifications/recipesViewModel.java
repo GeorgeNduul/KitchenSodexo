@@ -10,34 +10,16 @@ import java.util.List;
 
 public class recipesViewModel extends ViewModel {
 
-    private final MutableLiveData<List<Recipe>> recipeList = new MutableLiveData<>(new ArrayList<>());
-    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
+
+
 
     public recipesViewModel() {
-        loadRecipes();
+        //loadRecipesFromFirestore();
     }
 
-    public LiveData<List<Recipe>> getRecipes() {
-        return recipeList;
-    }
+//    public LiveData<List<Recipe>> getRecipes() {
+//        return recipeList;
+//    }
 
-    private void loadRecipes() {
-        db.collection("recipes").addSnapshotListener((value, error) -> {
-            if (error != null) return;
-            List<Recipe> recipes = new ArrayList<>();
-            if (value != null) {
-                for (QueryDocumentSnapshot doc : value) {
-                    Recipe recipe = doc.toObject(Recipe.class);
-                    recipes.add(recipe);
-                }
-                recipeList.setValue(recipes);
-            }
-        });
-    }
 
-    public void addRecipe(String name, String desc, String allergies) {
-        String id = db.collection("recipes").document().getId();
-        Recipe newRecipe = new Recipe(id, name, desc, allergies);
-        db.collection("recipes").document(id).set(newRecipe);
-    }
 }

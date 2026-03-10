@@ -1,26 +1,31 @@
 package com.example.recipeapp2.ui.notifications;
 
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.example.recipeapp2.R;
-import java.util.ArrayList;
+
 import java.util.List;
 
 public class RecipeAdapter extends RecyclerView.Adapter<RecipeAdapter.ViewHolder> {
 
-    private List<Recipe> recipes = new ArrayList<>();
+    private List<Recipe> recipes;
     private final OnRecipeClickListener listener;
 
     public interface OnRecipeClickListener {
         void onRecipeClick(Recipe recipe);
+        void onDeleteClick(Recipe recipe);
     }
 
     public RecipeAdapter(List<Recipe> recipes, OnRecipeClickListener listener) {
-        this.recipes = recipes != null ? recipes : new ArrayList<>();
+        this.recipes = recipes;
         this.listener = listener;
     }
 
@@ -31,19 +36,19 @@ public class RecipeAdapter extends RecyclerView.Adapter<RecipeAdapter.ViewHolder
 
     @NonNull
     @Override
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+    public RecipeAdapter.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_recipe, parent, false);
         return new ViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+    public void onBindViewHolder(@NonNull RecipeAdapter.ViewHolder holder, int position) {
         Recipe recipe = recipes.get(position);
 
         holder.name.setText(recipe.getName());
         holder.desc.setText(recipe.getDescription());
 
-        // Fix: Display allergies if they exist, hide the field if they don't
+        // Allergy Logic: Only show if text exists
         if (recipe.getAllergies() != null && !recipe.getAllergies().isEmpty()) {
             holder.allergies.setText("Allergies: " + recipe.getAllergies());
             holder.allergies.setVisibility(View.VISIBLE);
@@ -51,23 +56,36 @@ public class RecipeAdapter extends RecyclerView.Adapter<RecipeAdapter.ViewHolder
             holder.allergies.setVisibility(View.GONE);
         }
 
+        // Click on the card for details
         holder.itemView.setOnClickListener(v -> {
-            if (listener != null) listener.onRecipeClick(recipe);
+            if (listener != null) {
+                listener.onRecipeClick(recipe);
+            }
+        });
+
+        // Click on the Trash Icon to delete
+        holder.btnDelete.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onDeleteClick(recipe);
+            }
         });
     }
 
     @Override
     public int getItemCount() {
-        return recipes.size();
+        return recipes != null ? recipes.size() : 0;
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
         TextView name, desc, allergies;
+        ImageButton btnDelete; // New Button Reference
+
         public ViewHolder(View itemView) {
             super(itemView);
             name = itemView.findViewById(R.id.recipeName);
             desc = itemView.findViewById(R.id.recipeDesc);
-            allergies = itemView.findViewById(R.id.recipeAllergies); // Linked to XML
+            allergies = itemView.findViewById(R.id.recipeAllergies);
+            btnDelete = itemView.findViewById(R.id.btnDelete); // Bind the button
         }
     }
 }
