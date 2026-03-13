@@ -7,17 +7,19 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.recipeapp2.R;
-import com.example.recipeapp2.databinding.FragmentRecipeBinding;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
@@ -27,31 +29,32 @@ import java.util.List;
 public class recipesFragment extends Fragment {
 
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
+    private final FirebaseAuth mAuth = FirebaseAuth.getInstance();
 
     private List<Recipe> recipeList_v2 = new ArrayList<>();
     private RecyclerView recyclerView;
-    private FragmentRecipeBinding binding;
     private RecipeAdapter adapter;
     private FloatingActionButton fab;
-    private View view;
+    private TextView tvSearchStatus; // Added to show search context
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
-        view = inflater.inflate(R.layout.fragment_recipe, container, false);
+        View view = inflater.inflate(R.layout.fragment_recipe, container, false);
 
         recyclerView = view.findViewById(R.id.recipeRecyclerView);
         fab = view.findViewById(R.id.fabAddRecipe);
 
-        // FIX: Ensure RecyclerView is not null and set layout manager safely
+        // Use a simple TextView for search status (Optional: Add this to your fragment_recipe.xml)
+        // For now, we will handle logic; ensure your RecyclerView is correctly ID'd.
+
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
-        // FIX: Create a persistent adapter to avoid null crashes
         adapter = new RecipeAdapter(recipeList_v2, new RecipeAdapter.OnRecipeClickListener() {
             @Override
             public void onRecipeClick(Recipe recipe) {
-                // Future: Click to see details
+                // Future: Show details
             }
 
             @Override
@@ -61,64 +64,76 @@ public class recipesFragment extends Fragment {
         });
 
         recyclerView.setAdapter(adapter);
-
-        // FloatingActionButton listener
         fab.setOnClickListener(v -> showAddRecipeDialog());
 
-        // FIX: Load Firestore safely AFTER adapter is ready
         loadRecipesFromFirestore();
 
         return view;
     }
 
-
     private void loadRecipesFromFirestore() {
+        if (mAuth.getCurrentUser() == null) return;
 
-        db.collection("recipes").addSnapshotListener((value, error) -> {
+        String currentUid = mAuth.getCurrentUser().getUid();
 
-            if (error != null) {
-                Log.e("TAG", "Firestore Error: ", error);
-                return;
-            }
+        // 1. Capture the search query sent from HomeFragment
+        final String searchQuery = getArguments() != null ? getArguments().getString("search_query") : null;
 
-            if (value == null) return;
+        db.collection("recipes")
+                .whereEqualTo("userId", currentUid)
+                .addSnapshotListener((value, error) -> {
+                    if (error != null) {
+                        Log.e("TAG", "Firestore Error: ", error);
+                        return;
+                    }
 
-            // FIX: Clear list but avoid null adapter issues
-            List<Recipe> updatedList = new ArrayList<>();
+                    if (value == null) return;
 
-            for (QueryDocumentSnapshot doc : value) {
-                Recipe r = doc.toObject(Recipe.class);
-                r.setId(doc.getId());
-                updatedList.add(r);
-            }
+                    List<Recipe> updatedList = new ArrayList<>();
+                    for (QueryDocumentSnapshot doc : value) {
+                        Recipe r = doc.toObject(Recipe.class);
+                        r.setId(doc.getId());
 
-            // FIX: Update adapter safely
-            if (adapter != null) {
-                recipeList_v2 = updatedList;
-                adapter.updateList(updatedList);
-            }
+                        // 2. Logic: If searchQuery exists, filter by name
+                        if (searchQuery != null && !searchQuery.isEmpty()) {
+                            if (r.getName() != null && r.getName().toLowerCase().contains(searchQuery.toLowerCase())) {
+                                updatedList.add(r);
+                            }
+                        } else {
+                            // 3. No search? Show everything for this user
+                            updatedList.add(r);
+                        }
+                    }
 
-            Log.d("TAG", "Loaded recipes: " + updatedList.size());
-        });
+                    if (adapter != null) {
+                        recipeList_v2 = updatedList;
+                        adapter.updateList(updatedList);
+                    }
+
+                    // Optional Toast to let user know they are looking at filtered results
+                    if (searchQuery != null && !searchQuery.isEmpty() && isAdded()) {
+                        Toast.makeText(getContext(), "Showing results for: " + searchQuery, Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 
-
     public void addRecipe(String name, String desc, String allergies) {
+        if (mAuth.getCurrentUser() == null) return;
+
+        String currentUid = mAuth.getCurrentUser().getUid();
         String id = db.collection("recipes").document().getId();
-        Recipe newRecipe = new Recipe(id, name, desc, allergies);
+
+        Recipe newRecipe = new Recipe(id, name, desc, allergies, currentUid);
 
         db.collection("recipes").document(id)
                 .set(newRecipe)
                 .addOnSuccessListener(unused -> {
-                    Log.d("TAG", "Recipe added: " + id);
                     Toast.makeText(getContext(), "Recipe added", Toast.LENGTH_SHORT).show();
                 })
                 .addOnFailureListener(e -> {
-                    Log.e("TAG", "Failed to add recipe", e);
                     Toast.makeText(getContext(), "Add failed", Toast.LENGTH_SHORT).show();
                 });
     }
-
 
     public void deleteRecipe(String id) {
         if (id != null) {
@@ -128,14 +143,10 @@ public class recipesFragment extends Fragment {
                             Toast.makeText(getContext(), "Deleted", Toast.LENGTH_SHORT).show()
                     )
                     .addOnFailureListener(e -> {
-                        Log.e("TAG", "Delete failed", e);
                         Toast.makeText(getContext(), "Delete failed", Toast.LENGTH_SHORT).show();
                     });
-        } else {
-            Toast.makeText(getContext(), "Invalid Recipe ID", Toast.LENGTH_SHORT).show();
         }
     }
-
 
     private void showAddRecipeDialog() {
         LinearLayout layout = new LinearLayout(getContext());
@@ -172,7 +183,6 @@ public class recipesFragment extends Fragment {
                 .show();
     }
 
-
     private void showDeleteConfirmation(Recipe recipe) {
         new MaterialAlertDialogBuilder(requireContext())
                 .setTitle("Delete Recipe")
@@ -180,12 +190,5 @@ public class recipesFragment extends Fragment {
                 .setPositiveButton("Delete", (dialog, which) -> deleteRecipe(recipe.getId()))
                 .setNegativeButton("Cancel", null)
                 .show();
-    }
-
-
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        binding = null;
     }
 }
