@@ -78,7 +78,7 @@ public class RecipeAdapter extends RecyclerView.Adapter<RecipeAdapter.ViewHolder
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
         TextView name, desc, allergies;
-        ImageButton btnDelete; // New Button Reference
+        ImageButton btnDelete;
 
         public ViewHolder(View itemView) {
             super(itemView);

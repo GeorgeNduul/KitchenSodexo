@@ -166,12 +166,26 @@ public class MainActivity extends AppCompatActivity {
     private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
         @Override
         public void onAvailable(@NonNull Network network) {
-            runOnUiThread(() -> Toast.makeText(MainActivity.this, "Online", Toast.LENGTH_SHORT).show());
+            runOnUiThread(() -> {
+                // Re-enable buttons when internet returns
+                signUpButton.setEnabled(true);
+                loginButton.setEnabled(true);
+                signUpButton.setAlpha(1.0f); // Make them look active
+                loginButton.setAlpha(1.0f);
+                Toast.makeText(MainActivity.this, "Online: Features Restored", Toast.LENGTH_SHORT).show();
+            });
         }
 
         @Override
         public void onLost(@NonNull Network network) {
-            runOnUiThread(() -> Toast.makeText(MainActivity.this, "No Connection", Toast.LENGTH_LONG).show());
+            runOnUiThread(() -> {
+                // Disable buttons to prevent "Ghost" clicks
+                signUpButton.setEnabled(false);
+                loginButton.setEnabled(false);
+                signUpButton.setAlpha(0.5f); // Make them look "greyed out"
+                loginButton.setAlpha(0.5f);
+                Toast.makeText(MainActivity.this, "Offline: Check your connection", Toast.LENGTH_LONG).show();
+            });
         }
     };
 }
