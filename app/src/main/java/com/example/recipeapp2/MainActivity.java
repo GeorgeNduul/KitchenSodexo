@@ -6,6 +6,7 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
@@ -19,11 +20,14 @@ import androidx.core.view.WindowInsetsCompat;
 
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException;
+import com.google.firebase.auth.FirebaseAuthInvalidUserException;
+import com.google.firebase.auth.FirebaseAuthUserCollisionException;
 
 public class MainActivity extends AppCompatActivity {
 
     private FirebaseAuth mAuth;
-    private Button signUpButton, loginButton;
+    private Button signUpButton, loginButton, forgotPasswordButton;
     private TextInputEditText emailField, passwordField;
 
     @Override
@@ -37,14 +41,15 @@ public class MainActivity extends AppCompatActivity {
         initView();
         setupNetworkMonitoring();
 
-        // Listeners for both actions
         signUpButton.setOnClickListener(v -> signUpUser());
         loginButton.setOnClickListener(v -> signInUser());
+        forgotPasswordButton.setOnClickListener(v -> resetPassword());
     }
 
     private void initView() {
         signUpButton = findViewById(R.id.button);
         loginButton = findViewById(R.id.btnLogin);
+        forgotPasswordButton = findViewById(R.id.btnForgotPassword);
         emailField = findViewById(R.id.editTextTextEmailAddress);
         passwordField = findViewById(R.id.editTextTextPassword);
 
@@ -62,7 +67,13 @@ public class MainActivity extends AppCompatActivity {
 
         if (validateInput(email, password)) {
             mAuth.createUserWithEmailAndPassword(email, password)
-                    .addOnCompleteListener(this, task -> handleAuthResult(task.isSuccessful(), "Sign Up Successful"));
+                    .addOnCompleteListener(this, task -> {
+                        if (task.isSuccessful()) {
+                            handleAuthResult(true, "Sign Up Successful");
+                        } else {
+                            handleFirebaseError(task.getException());
+                        }
+                    });
         }
     }
 
@@ -72,8 +83,49 @@ public class MainActivity extends AppCompatActivity {
 
         if (validateInput(email, password)) {
             mAuth.signInWithEmailAndPassword(email, password)
-                    .addOnCompleteListener(this, task -> handleAuthResult(task.isSuccessful(), "Login Successful"));
+                    .addOnCompleteListener(this, task -> {
+                        if (task.isSuccessful()) {
+                            handleAuthResult(true, "Login Successful");
+                        } else {
+                            handleFirebaseError(task.getException());
+                        }
+                    });
         }
+    }
+
+    private void resetPassword() {
+        String email = getTrimmedText(emailField);
+        if (TextUtils.isEmpty(email)) {
+            emailField.setError("Enter your email to reset password");
+            return;
+        }
+
+        mAuth.sendPasswordResetEmail(email)
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        Toast.makeText(MainActivity.this, "Reset link sent to your email", Toast.LENGTH_LONG).show();
+                    } else {
+                        handleFirebaseError(task.getException());
+                    }
+                });
+    }
+
+    private void handleFirebaseError(Exception e) {
+        String message = "Authentication Failed";
+
+        if (e instanceof FirebaseAuthUserCollisionException) {
+            message = "This email address is already registered.";
+            emailField.setError("Email already exists");
+        } else if (e instanceof FirebaseAuthInvalidCredentialsException) {
+            message = "Invalid password or email format.";
+        } else if (e instanceof FirebaseAuthInvalidUserException) {
+            message = "No account found with this email.";
+            emailField.setError("Account not found");
+        } else if (e != null) {
+            message = e.getLocalizedMessage();
+        }
+
+        Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
     }
 
     private String getTrimmedText(TextInputEditText field) {
@@ -81,8 +133,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean validateInput(String email, String password) {
-        if (email.isEmpty() || password.isEmpty()) {
-            Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show();
+        if (TextUtils.isEmpty(email)) {
+            emailField.setError("Email is required");
+            return false;
+        }
+        if (TextUtils.isEmpty(password) || password.length() < 6) {
+            passwordField.setError("Password must be at least 6 characters");
             return false;
         }
         return true;
@@ -93,16 +149,12 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
             startActivity(new Intent(MainActivity.this, HomePage.class));
             finish();
-        } else {
-            Toast.makeText(MainActivity.this, "Authentication Failed", Toast.LENGTH_SHORT).show();
         }
     }
 
     private void setupNetworkMonitoring() {
         NetworkRequest networkRequest = new NetworkRequest.Builder()
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
                 .build();
 
         ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(ConnectivityManager.class);
@@ -114,24 +166,12 @@ public class MainActivity extends AppCompatActivity {
     private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
         @Override
         public void onAvailable(@NonNull Network network) {
-            super.onAvailable(network);
-            runOnUiThread(() -> Toast.makeText(MainActivity.this, "Connected to Internet", Toast.LENGTH_SHORT).show());
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, "Online", Toast.LENGTH_SHORT).show());
         }
 
         @Override
         public void onLost(@NonNull Network network) {
-            super.onLost(network);
-            runOnUiThread(() -> Toast.makeText(MainActivity.this, "Connection Lost", Toast.LENGTH_LONG).show());
-        }
-
-        @Override
-        public void onCapabilitiesChanged(@NonNull Network network, @NonNull NetworkCapabilities capabilities) {
-            super.onCapabilitiesChanged(network, capabilities);
-            boolean isUnmetered = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
-            runOnUiThread(() -> {
-                String type = isUnmetered ? "Wi-Fi (Unmetered)" : "Data (Metered)";
-                Toast.makeText(MainActivity.this, "Using " + type, Toast.LENGTH_SHORT).show();
-            });
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, "No Connection", Toast.LENGTH_LONG).show());
         }
     };
 }
