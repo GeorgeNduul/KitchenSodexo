@@ -29,7 +29,7 @@ public class HomeFragment extends Fragment {
     public HomeFragment() {
         // Required empty public constructor
     }
-
+//binding links my code with my UI
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
@@ -47,7 +47,7 @@ public class HomeFragment extends Fragment {
         // 2. Handle the Search Button Click
         binding.btnSearch.setOnClickListener(v -> {
             String query = binding.etSearchRecipe.getText().toString().trim();
-
+// passing data between fragments
             Bundle bundle = new Bundle();
             bundle.putString("search_query", query);
 
@@ -58,16 +58,19 @@ public class HomeFragment extends Fragment {
     }
 
     private void setupSearchSuggestions() {
+        //checks to see user is logged in
         if (mAuth.getCurrentUser() == null) return;
 
+        //to fetch only the current users recipe from firebase
         String currentUid = mAuth.getCurrentUser().getUid();
 
-        // Fetch user's recipes to fill the suggestion list
+        // Fetch  current user's recipes from firebase to fill the suggestion list
         db.collection("recipes")
                 .whereEqualTo("userId", currentUid)
                 .get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
                     List<String> suggestions = new ArrayList<>();
+                    // get recipe name from documents
                     for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
                         String recipeName = doc.getString("name");
                         if (recipeName != null) {
@@ -75,7 +78,7 @@ public class HomeFragment extends Fragment {
                         }
                     }
 
-                    // Create adapter for the dropdown list
+                    // This adapter holds the list of recipe names and tells Android how to display them in the dropdown.
                     if (getContext() != null) {
                         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                                 getContext(),

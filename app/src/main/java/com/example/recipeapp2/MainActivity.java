@@ -151,7 +151,7 @@ public class MainActivity extends AppCompatActivity {
             finish();
         }
     }
-
+//this piece of code is not mine and i have refrenced it
     private void setupNetworkMonitoring() {
         NetworkRequest networkRequest = new NetworkRequest.Builder()
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -162,7 +162,7 @@ public class MainActivity extends AppCompatActivity {
             connectivityManager.requestNetwork(networkRequest, networkCallback);
         }
     }
-
+    //this piece of code is not mine and i have refrenced it
     private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
         @Override
         public void onAvailable(@NonNull Network network) {

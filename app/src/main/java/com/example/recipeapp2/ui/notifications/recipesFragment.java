@@ -28,7 +28,7 @@ public class recipesFragment extends Fragment {
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final FirebaseAuth mAuth = FirebaseAuth.getInstance();
 
-    private recipesViewModel viewModel; // Added ViewModel
+    private recipesViewModel viewModel;
     private RecyclerView recyclerView;
     private RecipeAdapter adapter;
     private FloatingActionButton fab;
